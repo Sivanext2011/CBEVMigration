@@ -42,11 +42,21 @@ transfer channel).
 ```bash
 tar xzf cbevmigration_offline.tgz
 cd CBEVMigration
+chmod +x *.sh                   # if the exec bit didn't survive transfer
 ./install_offline.sh            # creates .venv and installs from wheelhouse (no internet)
 ```
 Options:
-- `NO_VENV=1 ./install_offline.sh` — install into the current Python instead of a venv.
+- `NO_VENV=1 ./install_offline.sh` — install into the system Python (`--user`), no venv.
 - `PYTHON=/path/to/python3.11 ./install_offline.sh` — pick a specific interpreter.
+
+**If you see `ensurepip is not available` / `python3-venv` missing** (common on
+air-gapped Debian/Ubuntu): the installer now **auto-falls back to a `--user`
+install** into the system Python — no venv, no root, no internet needed. You can
+also force it explicitly:
+```bash
+NO_VENV=1 ./install_offline.sh
+```
+(Or install `python3.12-venv` offline if you prefer a venv.)
 
 The installer verifies the imports at the end.
 
