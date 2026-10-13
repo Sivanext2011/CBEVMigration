@@ -40,9 +40,10 @@ MOUNTS=(
   -v "$HERE/migration/config/migration_config.json:/app/migration/config/migration_config.json:ro"
   -v "$DATA_DIR:/app/data"
 )
-# mount certs at the path the config expects (default repo/config/certs)
+# mount the certs dir at /app/config/certs so the config's relative cert paths
+# (config/certs/...) resolve inside the container (WORKDIR=/app).
 if [[ -d "$CERTS_DIR" ]]; then
-  MOUNTS+=(-v "$CERTS_DIR:$CERTS_DIR:ro")
+  MOUNTS+=(-v "$CERTS_DIR:/app/config/certs:ro")
 fi
 
 # --network host so the tool can reach AIR / CBEV / SOCKS exactly as the host does

@@ -25,9 +25,15 @@
   },
   "tls": {
     "ssl_verify": false,
-    "ca_cert_path": "C:\\Users\\eransva\\Downloads\\ECEV_Provisning_v2\\config\\certs\\ca.crt",
-    "client_cert_path": "C:\\Users\\eransva\\Downloads\\ECEV_Provisning_v2\\config\\certs\\client_cert.crt",
-    "client_key_path": "C:\\Users\\eransva\\Downloads\\ECEV_Provisning_v2\\config\\certs\\client_key.key"
+    "ca_cert_path": "config/certs/ca.crt",
+    "client_cert_path": "config/certs/client_cert.crt",
+    "client_key_path": "config/certs/client_key.key"
+  },
+  "batch_tls": {
+    "ssl_verify": false,
+    "ca_cert_path": "config/certs/batch-ca.crt",
+    "client_cert_path": "config/certs/batch-client.crt",
+    "client_key_path": "config/certs/batch-client.key"
   },
   "network": {
     "socks5_proxy": "socks5://127.0.0.1:1234",
