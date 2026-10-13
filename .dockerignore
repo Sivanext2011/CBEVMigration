@@ -1,0 +1,23 @@
+# Keep the image lean and secret-free (config + certs are MOUNTED at runtime)
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+wheelhouse/
+*.tgz
+*.tar
+*.html
+e2e_state.db
+
+# Do NOT bake live config / certs into the image
+config/config.json
+config/certs/
+migration/config/migration_config.json
+
+# Docs / dev-only
+*.md
+make_offline_bundle.sh
+install_offline.sh
+run.sh
