@@ -292,6 +292,17 @@ class BssfMigrator:
             bucket.bucket_spec_external_id)
         if spec_id:
             pb["bucketSpecId"] = spec_id
+        # Target the bucket's EXISTING active value container (the one the POP
+        # SetInitialAllocation/SetRecurrenceAllocation created at contract time)
+        # by carrying its validFor window on the Set. Without this, CPM opens a
+        # NEW container instead of updating the full allocation in place.
+        vf: dict[str, Any] = {}
+        if container_start:
+            vf["startDateTime"] = container_start
+        if container_end:
+            vf["endDateTime"] = container_end
+        if vf:
+            pb["validFor"] = vf
         return {
             "triggerTime": now,
             "relatedParty": {"@referredType": "Customer",
