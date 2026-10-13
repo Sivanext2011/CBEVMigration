@@ -49,7 +49,8 @@ def _load_config(path: str | Path) -> dict:
         return json.load(f)
 
 
-def _build_orchestrator(config: dict, *, dry_run: bool, do_ec_delete: bool) -> Orchestrator:
+def _build_orchestrator(config: dict, *, dry_run: bool, do_ec_delete: bool,
+                        fast: bool = False) -> Orchestrator:
     ucip = UcipClient(config)
     wb_path = config.get("mapping_workbook", "migration/config/mapping_template.xlsx")
     if not Path(wb_path).is_absolute():
@@ -73,14 +74,25 @@ def _build_orchestrator(config: dict, *, dry_run: bool, do_ec_delete: bool) -> O
     tolerance = config.get("options", {}).get("verify_tolerance_bytes", 0)
     verifier = Verifier(migrator, tolerance_bytes=tolerance)
     store = StateStore()
+    # Timings: --fast uses minimal delays for demos (relies on the in-place
+    # value-container update so the balance reflects immediately). Default is
+    # the conservative schedule for slower/throttled environments.
+    if fast:
+        timings = dict(customer_settle_seconds=2.0,
+                       verify_poll_schedule=(3, 5, 7),      # ~15s worst case
+                       verify_settle_seconds=10.0)
+    else:
+        timings = dict(customer_settle_seconds=8.0,
+                       verify_poll_schedule=(15, 15, 15, 20, 25),
+                       verify_settle_seconds=60.0)
     return Orchestrator(ucip, engine, migrator, verifier, store,
-                        do_ec_delete=do_ec_delete, dry_run=dry_run)
+                        do_ec_delete=do_ec_delete, dry_run=dry_run, **timings)
 
 
 async def _cmd_migrate(args):
     config = _load_config(args.config)
     do_del = config.get("options", {}).get("do_ec_delete", True) and not args.no_ec_delete
-    orch = _build_orchestrator(config, dry_run=args.dry_run, do_ec_delete=do_del)
+    orch = _build_orchestrator(config, dry_run=args.dry_run, do_ec_delete=do_del, fast=getattr(args, "fast", False))
     await orch.store.init()
     # subordinate / multi-SIM MSISDNs supplied by the user (comma-separated).
     # Each item may be "msisdn" or "msisdn:imsi".
@@ -104,7 +116,7 @@ async def _cmd_migrate(args):
 async def _cmd_batch(args):
     config = _load_config(args.config)
     do_del = config.get("options", {}).get("do_ec_delete", True) and not args.no_ec_delete
-    orch = _build_orchestrator(config, dry_run=args.dry_run, do_ec_delete=do_del)
+    orch = _build_orchestrator(config, dry_run=args.dry_run, do_ec_delete=do_del, fast=getattr(args, "fast", False))
     await orch.store.init()
 
     src = args.source
@@ -230,12 +242,16 @@ def build_parser() -> argparse.ArgumentParser:
     pm.add_argument("--dry-run", action="store_true", help="fetch+map only, no ECEV writes")
     pm.add_argument("--no-ec-delete", action="store_true", help="do not delete from EC")
     pm.add_argument("--force", action="store_true", help="re-run even if already migrated")
+    pm.add_argument("--fast", action="store_true",
+                    help="minimal settle/verify delays for demos (~15s vs ~90s)")
 
     pb = sub.add_parser("batch", help="migrate many subscribers (file or comma list)")
     pb.add_argument("source", help="path to a file of MSISDNs, or comma-separated list")
     pb.add_argument("--dry-run", action="store_true")
     pb.add_argument("--no-ec-delete", action="store_true")
     pb.add_argument("--force", action="store_true")
+    pb.add_argument("--fast", action="store_true",
+                    help="minimal settle/verify delays for demos (~15s vs ~90s)")
 
     sub.add_parser("report", help="print the reconciliation report")
     return p

@@ -43,6 +43,7 @@ class Orchestrator:
         dry_run: bool = False,
         verify_settle_seconds: float = 60.0,
         customer_settle_seconds: float = 8.0,
+        verify_poll_schedule: tuple = (15, 15, 15, 20, 25),
     ):
         self.ucip = ucip
         self.engine = engine
@@ -54,6 +55,8 @@ class Orchestrator:
         # Seconds to wait after bucket adjustments before reconciling, so CPM's
         # time-sliced value containers become the active 'current' value.
         self.verify_settle_seconds = verify_settle_seconds
+        # Poll delays (seconds) between verify attempts; stops early once passed.
+        self.verify_poll_schedule = tuple(verify_poll_schedule) or (15,)
         # Seconds to wait after creating the customer before creating the contract,
         # so BSSF propagates the customer (avoids intermittent 403).
         self.customer_settle_seconds = customer_settle_seconds
@@ -160,7 +163,7 @@ class Orchestrator:
             # with a single re-apply if still off.
             import asyncio as _asyncio
             report = None
-            for delay in (15, 15, 15, 20, 25):   # cumulative ~90s
+            for delay in self.verify_poll_schedule:
                 await _asyncio.sleep(delay)
                 report = await self.verifier.verify(plan)
                 result.verify_report = report
