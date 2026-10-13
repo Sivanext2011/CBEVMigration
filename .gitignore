@@ -1,0 +1,22 @@
+# Live config & secrets
+config/config.json
+config/config.*.backup.json
+config/config.*.bak
+config/certs/
+migration/config/migration_config.json
+token.json
+
+# Data / logs
+*.log
+logs/
+*.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Generated reports / outputs
+*.html.out
+migration_state.json
