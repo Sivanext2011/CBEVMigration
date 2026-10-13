@@ -20,3 +20,7 @@ __pycache__/
 # Generated reports / outputs
 *.html.out
 migration_state.json
+migration_report.html
+cbev_migration_report.html
+report*.html
+e2e_state.db
