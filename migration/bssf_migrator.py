@@ -332,35 +332,77 @@ class BssfMigrator:
         return found[0] if found else None
 
     def _current_container(self, bucket: dict):
-        """Return (startDateTime, endDateTime, bucketSpecId) to target the bucket's
-        existing/active value container in the Set.
+        """Return (startDateTime, endDateTime, bucketSpecId) targeting the bucket's
+        value container that is ACTIVE RIGHT NOW, i.e. the container whose own
+        validFor window spans the current time (start <= now < end). That is the
+        container holding the current consumable balance (e.g. the short
+        20:21->20:22 window), NOT the open-ended 9999 recurrence container.
 
-        The successful manual request used the bucket's REAL creation start (a
-        recent timestamp), NOT the historical 0001-01-01 container start (which
-        the API rejects with 403). So we prefer the bucket-level
-        validFor.startDateTime; fall back to the active container window only if
-        it is a real (non-0001) date."""
+        The Set must carry THAT container's exact start+end so CPM updates it in
+        place instead of opening a new container. We never send the unsettable
+        0001-01-01 start.
+        """
         if not bucket:
             return (None, None, None)
         spec_id = bucket.get("bucketSpecId")
-        # bucket-level validFor start is the real creation time (settable).
-        bucket_vf = bucket.get("validFor", {}) or {}
-        start = bucket_vf.get("startDateTime")
-        end = None
         containers = bucket.get("valueContainer") or []
+
+        from datetime import datetime, timezone
+
+        def _parse(ts):
+            if not ts or str(ts).startswith("0001"):
+                return None
+            if str(ts).startswith("9999"):
+                return datetime.max.replace(tzinfo=timezone.utc)
+            s = str(ts).replace("Z", "+00:00")
+            try:
+                d = datetime.fromisoformat(s)
+                return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+            except Exception:
+                return None
+
+        now = datetime.now(timezone.utc)
+        active = None          # container active at now
         for c in containers:
             vf = c.get("validFor", {}) or {}
-            if str(vf.get("endDateTime", "")).startswith("9999"):
-                end = vf.get("endDateTime")
-                # if bucket-level start missing/0001, use this container start when real
-                cs = vf.get("startDateTime", "")
-                if (not start or str(start).startswith("0001")) and cs and not str(cs).startswith("0001"):
-                    start = cs
-        if not end:
-            end = "9999-12-31T12:00:00.001+00:00"
-        # never send the unsettable 0001-01-01 start
+            s = _parse(vf.get("startDateTime"))
+            e = _parse(vf.get("endDateTime"))
+            after = (s is None) or (s <= now)
+            before = (e is None) or (now < e)
+            if after and before:
+                # prefer a container that actually holds a positive amount
+                amt = 0
+                try:
+                    amt = int((c.get("amount") or {}).get("number") or c.get("value") or 0)
+                except Exception:
+                    amt = 0
+                if active is None or amt > 0:
+                    active = c
+                    if amt > 0:
+                        break
+
+        if active is None:
+            # fallback: the open-ended 9999 container, else the bucket-level validFor
+            for c in containers:
+                vf = c.get("validFor", {}) or {}
+                if str(vf.get("endDateTime", "")).startswith("9999"):
+                    active = c
+                    break
+
+        if active is None:
+            bvf = bucket.get("validFor", {}) or {}
+            start = bvf.get("startDateTime")
+            if start and str(start).startswith("0001"):
+                start = None
+            return (start, "9999-12-31T12:00:00.001+00:00", spec_id)
+
+        vf = active.get("validFor", {}) or {}
+        start = vf.get("startDateTime")
+        end = vf.get("endDateTime")
         if start and str(start).startswith("0001"):
             start = None
+        if not end:
+            end = "9999-12-31T12:00:00.001+00:00"
         return (start, end, spec_id)
 
     # -- API calls --------------------------------------------------------
